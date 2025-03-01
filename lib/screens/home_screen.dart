@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/api_service.dart';
+import 'MatchListScreen.dart'; // Import màn hình trận đấu
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -27,18 +28,19 @@ class _HomeScreenState extends State<HomeScreen> {
         future: _leagues,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator()); // Hiển thị loading
+            return Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text("Lỗi: ${snapshot.error}")); // Hiển thị lỗi nếu có
+            return Center(child: Text("Lỗi: ${snapshot.error}"));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text("Không có giải đấu nào!")); // Nếu không có dữ liệu
+            return Center(child: Text("Không có giải đấu nào!"));
           }
 
-          // Hiển thị danh sách giải đấu
+          final leagues = snapshot.data!.take(10).toList();
+
           return ListView.builder(
-            itemCount: snapshot.data!.length,
+            itemCount: leagues.length,
             itemBuilder: (context, index) {
-              final league = snapshot.data![index];
+              final league = leagues[index];
               return Card(
                 margin: EdgeInsets.all(10),
                 child: ListTile(
@@ -47,6 +49,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       : Icon(Icons.sports_soccer, size: 50, color: Colors.grey),
                   title: Text(league["name"], maxLines: 2, overflow: TextOverflow.ellipsis),
                   subtitle: Text("Quốc gia: ${league["area"]["name"]}"),
+                  onTap: () {
+                    // Chuyển sang màn hình danh sách trận đấu
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MatchListScreen(leagueId: league["id"]),
+                      ),
+                    );
+                  },
                 ),
               );
             },
