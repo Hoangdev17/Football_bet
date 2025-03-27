@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import '../core/api_service.dart';
+import '../core/match_odds_service.dart';
+import '../widgets/match/match_scoreboard.dart';
+import '../widgets/match/match_overview.dart' as match_overview; // Thêm alias
+import '../widgets/match/match_odds.dart';
+import '../widgets/match/match_stats.dart' as match_stats; // Thêm alias
+import '../widgets/match/match_lineups.dart';
+import '../widgets/match/match_h2h.dart';
+import '../widgets/match/match_standings.dart';
 
 class MatchInforScreen extends StatefulWidget {
   final int matchId;
 
-
-
-  MatchInforScreen({required this.matchId});
+  const MatchInforScreen({required this.matchId, Key? key}) : super(key: key);
 
   @override
   _MatchInforScreenState createState() => _MatchInforScreenState();
@@ -15,12 +21,30 @@ class MatchInforScreen extends StatefulWidget {
 class _MatchInforScreenState extends State<MatchInforScreen> {
   late Future<Map<String, dynamic>> _matchDetail;
   late Future<Map<String, dynamic>> _matchStats;
+  late Future<Map<String, dynamic>> _standings;
+  late Future<Map<String, dynamic>> _h2hMatches;
+  late Future<Map<String, dynamic>> _homeTeamDetail;
+  late Future<Map<String, dynamic>> _awayTeamDetail;
+  int? homeTeamId;
+  int? awayTeamId;
+  final MatchOddsService _matchOddsService = MatchOddsService();
 
   @override
   void initState() {
     super.initState();
     _matchStats = ApiService.fetchMatchStats(widget.matchId);
-    _matchDetail = ApiService.fetchMatchDetail(widget.matchId);
+    _matchDetail = ApiService.fetchMatchDetail(widget.matchId).then((match) {
+      homeTeamId = match["homeTeam"]["id"];
+      awayTeamId = match["awayTeam"]["id"];
+      return match;
+    });
+    _standings = _matchDetail.then((match) {
+      final competitionId = match["competition"]["id"];
+      return ApiService.fetchStandings(competitionId);
+    });
+    _h2hMatches = ApiService.fetchHeadToHead(widget.matchId);
+    _homeTeamDetail = _matchDetail.then((_) => ApiService.fetchTeamDetail(homeTeamId!));
+    _awayTeamDetail = _matchDetail.then((_) => ApiService.fetchTeamDetail(awayTeamId!));
   }
 
   @override
@@ -34,11 +58,11 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
           );
         } else if (snapshot.hasError) {
           return Scaffold(
-            body: Center(child: Text("Lỗi khi tải dữ liệu trận đấu!")),
+            body: Center(child: Text("Lỗi khi tải dữ liệu trận đấu: ${snapshot.error}")),
           );
         } else if (!snapshot.hasData) {
-          return Scaffold(
-            body: Center(child: Text("Không có dữ liệu trận đấu!")),
+          return const Scaffold(
+            body: Center(child: Text("Không có dữ liệu trận đấu")),
           );
         }
 
@@ -47,7 +71,6 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
         final awayTeam = match["awayTeam"];
         final score = match["score"]["fullTime"];
         final isFinished = match["status"] == "FINISHED";
-
         final homeScore = isFinished ? score["home"]?.toString() ?? "?" : "?";
         final awayScore = isFinished ? score["away"]?.toString() ?? "?" : "?";
 
@@ -56,32 +79,54 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
           child: Scaffold(
             appBar: AppBar(
               backgroundColor: Colors.green,
-              title: Text("Chi tiết trận đấu"),
+              title: const Text("Chi tiết trận đấu"),
               centerTitle: true,
+              bottom: const TabBar(
+                isScrollable: true,
+                tabs: [
+                  Tab(text: "Tổng quan"),
+                  Tab(text: "Tỷ lệ cược"),
+                  Tab(text: "Thống kê"),
+                  Tab(text: "Đội hình"),
+                  Tab(text: "Đối đầu"),
+                  Tab(text: "Bảng xếp hạng"),
+                ],
+              ),
             ),
             body: Column(
               children: [
-                _buildMatchScoreboard(homeTeam, awayTeam, homeScore, awayScore),
-                TabBar(
-                  tabs: [
-                    Tab(text: "Overview"),
-                    Tab(text: "Odds"),
-                    Tab(text: "Stats"),
-                    Tab(text: "Lineups"),
-                    Tab(text: "H2H"),
-                    Tab(text: "Standings"),
-                  ],
-                  isScrollable: true,
+                MatchScoreboard(
+                  homeTeam: homeTeam,
+                  awayTeam: awayTeam,
+                  homeScore: homeScore,
+                  awayScore: awayScore,
                 ),
                 Expanded(
                   child: TabBarView(
                     children: [
-                      _buildTabContent("Overview"),
-                      _buildTabContent("Odds"),
-                      _buildMatchStats(),
-                      _buildTabContent("Lineups"),
-                      _buildTabContent("H2H"),
-                      _buildTabContent("Standings"),
+                      match_overview.MatchOverview( // Sử dụng với alias
+                        matchDetail: _matchDetail,
+                        homeTeamDetail: _homeTeamDetail,
+                      ),
+                      MatchOdds(
+                        match: match,
+                        matchOddsService: _matchOddsService,
+                      ),
+                      match_stats.MatchStats( // Sử dụng với alias
+                        statsFuture: _matchStats,
+                      ),
+                      MatchLineups(
+                        homeTeamDetail: _homeTeamDetail,
+                        awayTeamDetail: _awayTeamDetail,
+                        homeTeamId: homeTeamId,
+                        awayTeamId: awayTeamId,
+                      ),
+                      MatchH2H(h2hFuture: _h2hMatches),
+                      MatchStandings(
+                        standingsFuture: _standings,
+                        homeTeamId: homeTeamId,
+                        awayTeamId: awayTeamId,
+                      ),
                     ],
                   ),
                 ),
@@ -90,153 +135,6 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
           ),
         );
       },
-    );
-  }
-
-  /// Widget hiển thị tab Stats
-  Widget _buildMatchStats() {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _matchStats,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
-
-        final stats = snapshot.data?['scorers'];
-
-        if (stats == null) {
-          return const Center(child: Text('No statistics available'));
-        }
-
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _buildStatProgress('Possession', stats['possession'], isPercentage: true),
-            _buildStatRow('Total Shots', stats['totalShots']),
-            _buildStatRow('Shots on Target', stats['shotsOnTarget']),
-            _buildStatRow('Passes', stats['totalPasses']),
-            _buildStatRow('Fouls', stats['fouls']),
-            _buildStatRow('Yellow Cards', stats['yellowCards']),
-            _buildStatRow('Red Cards', stats['redCards']),
-          ],
-        );
-      },
-    );
-  }
-  /// Support for _buildMatchStats
-  Widget _buildStatRow(String label, dynamic value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Text(value?.toString() ?? '-', style: const TextStyle(fontSize: 16)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatProgress(String label, dynamic value, {bool isPercentage = false}) {
-    double progress = 0;
-    if (value != null) {
-      progress = isPercentage ? (double.tryParse(value.toString()) ?? 0) / 100 : double.tryParse(value.toString()) ?? 0;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        ),
-        LinearProgressIndicator(
-          value: progress.clamp(0.0, 1.0),
-          backgroundColor: Colors.grey[300],
-          color: Colors.blue,
-          minHeight: 8,
-        ),
-        const SizedBox(height: 8),
-      ],
-    );
-  }
-
-
-  /// Widget hiển thị Timeline trận đấu
-  Widget _buildMatchTimeline() {
-    return Column(
-      children: [
-        Text("📅 Timeline trận đấu", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        SizedBox(height: 10),
-        // Dữ liệu giả lập (thay bằng API Football Data nếu có)
-        ListTile(
-          leading: Icon(Icons.sports_soccer, color: Colors.blue),
-          title: Text("29' Mohamed Salah (Diogo Jota)"),
-        ),
-        ListTile(
-          leading: Icon(Icons.sports_soccer, color: Colors.blue),
-          title: Text("38' Youri Tielemans"),
-        ),
-        ListTile(
-          leading: Icon(Icons.sports_soccer, color: Colors.blue),
-          title: Text("45+3' Ollie Watkins (Lucas Digne)"),
-        ),
-      ],
-    );
-  }
-
-  /// Widget hiển thị tỷ số trận đấu
-  Widget _buildMatchScoreboard(Map<String, dynamic> homeTeam, Map<String, dynamic> awayTeam, String homeScore, String awayScore) {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-      color: Colors.green,
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildTeamInfo(homeTeam),
-              Text(
-                "$homeScore - $awayScore",
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              _buildTeamInfo(awayTeam),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Widget hiển thị logo + tên đội bóng
-  Widget _buildTeamInfo(Map<String, dynamic> team) {
-    return Column(
-      children: [
-        Image.network(
-          team["crest"] ?? "",
-          width: 50,
-          height: 50,
-          errorBuilder: (context, error, stackTrace) => Icon(Icons.sports_soccer, size: 50, color: Colors.grey),
-        ),
-        SizedBox(height: 4),
-        Text(
-          team["name"],
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
-  /// Hàm giả lập nội dung của các tab khác
-  Widget _buildTabContent(String tabName) {
-    return Center(
-      child: Text(
-        "Nội dung của $tabName",
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-      ),
     );
   }
 }

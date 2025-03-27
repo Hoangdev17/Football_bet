@@ -46,7 +46,7 @@ class _MatchListScreenState extends State<MatchListScreen> {
             itemCount: matches.length,
             itemBuilder: (context, index) {
               final match = matches[index];
-              final matchId = match["id"]; // Lấy matchId
+              final matchId = match["id"];
               final homeTeam = match["homeTeam"];
               final awayTeam = match["awayTeam"];
               final score = match["score"]["fullTime"];
@@ -54,20 +54,6 @@ class _MatchListScreenState extends State<MatchListScreen> {
 
               final homeScore = isFinished ? score["home"]?.toString() ?? "?" : "?";
               final awayScore = isFinished ? score["away"]?.toString() ?? "?" : "?";
-
-              // Xác định màu đội thắng
-              Color homeColor = Colors.grey;
-              Color awayColor = Colors.grey;
-
-              if (isFinished) {
-                int home = int.tryParse(homeScore) ?? 0;
-                int away = int.tryParse(awayScore) ?? 0;
-                if (home > away) {
-                  homeColor = Colors.blue; // Đội nhà thắng
-                } else if (home < away) {
-                  awayColor = Colors.orange; // Đội khách thắng
-                }
-              }
 
               return GestureDetector(
                 onTap: () {
@@ -87,11 +73,65 @@ class _MatchListScreenState extends State<MatchListScreen> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        _buildTeamInfo(homeTeam, homeColor), // Đội nhà
-                        _buildScore(homeScore, awayScore), // Tỷ số
-                        _buildTeamInfo(awayTeam, awayColor), // Đội khách
+                        // Cột đội nhà (logo + tên)
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.network(
+                                homeTeam["crest"] ?? "",
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.sports_soccer, size: 40),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                homeTeam["name"],
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Cột tỷ số ở giữa
+                        SizedBox(
+                          width: 80,
+                          child: Center(
+                            child: Text(
+                              "$homeScore - $awayScore",
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+
+                        // Cột đội khách (logo + tên)
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.network(
+                                awayTeam["crest"] ?? "",
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.sports_soccer, size: 40),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                awayTeam["name"],
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -100,46 +140,6 @@ class _MatchListScreenState extends State<MatchListScreen> {
             },
           );
         },
-      ),
-    );
-  }
-
-  /// Widget hiển thị logo + tên đội
-  Widget _buildTeamInfo(Map<String, dynamic> team, Color textColor) {
-    return Expanded(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.network(
-            team["crest"] ?? "",
-            width: 40,
-            height: 40,
-            errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.sports_soccer, size: 40),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              team["name"],
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
-              textAlign: TextAlign.center,
-              softWrap: true,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Widget hiển thị tỷ số cân đối
-  Widget _buildScore(String homeScore, String awayScore) {
-    return Container(
-      width: 60,
-      alignment: Alignment.center,
-      child: Text(
-        "$homeScore - $awayScore",
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        textAlign: TextAlign.center,
       ),
     );
   }
