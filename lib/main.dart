@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/MatchListScreen.dart'; // Import màn hình danh sách trận đấu
 import 'screens/MatchInforScreen.dart';
+import 'screens/Live_Screen.dart';
+import 'screens/Tips_Screen.dart';
+import 'screens/Favorites_Screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -37,10 +40,9 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _tabs = [
     HomeScreen(),
-    Text("Live"),
-    Text("Tips"),
-    Text("Favorites"),
-    Text("Leagues"),
+    LiveMatchesScreen(),
+    TipsScreen(),
+    FavoritesScreen(),
   ];
 
   // Mở màn hình danh sách trận đấu
@@ -93,10 +95,6 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.people),
             label: "Favorites",
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "Leagues",
-          ),
         ],
         onTap: (index) {
           setState(() {
@@ -119,7 +117,6 @@ class _MainScreenState extends State<MainScreen> {
       case 3:
         return "Favorites";
       case 4:
-        return "Leagues";
       default:
         return "Football Bet";
     }

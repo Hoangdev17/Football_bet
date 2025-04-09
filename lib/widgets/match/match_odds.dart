@@ -1,95 +1,96 @@
 import 'package:flutter/material.dart';
-import '../../../core/match_odds_service.dart';
-import '../../utils/match_utils.dart';
 
 class MatchOdds extends StatelessWidget {
-  final Map<String, dynamic> match;
-  final MatchOddsService matchOddsService;
+  final Future<Map<String, dynamic>?> oddsFuture;
 
-  const MatchOdds({
-    required this.match,
-    required this.matchOddsService,
-    Key? key,
-  }) : super(key: key);
+  const MatchOdds({Key? key, required this.oddsFuture}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final areaCode = match["competition"]?["area"]?["code"] as String? ?? "ENG";
-
-    return FutureBuilder<Map<String, dynamic>>(
-      future: matchOddsService.mapMatchOdds(match, areaCode),
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: oddsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (snapshot.hasError) {
-          return Center(child: Text('Lỗi: ${snapshot.error}'));
+        if (snapshot.hasError || !snapshot.hasData) {
+          return const Center(child: Text("Không có dữ liệu tỷ lệ cược"));
         }
 
-        if (!snapshot.hasData || snapshot.data == null) {
-          return const Center(child: Text('Không có dữ liệu tỷ lệ cược'));
+        final odds = snapshot.data!;
+        final bets = odds["bets"];
+
+        // Tìm market 1X2 (Kết quả chính)
+        final mainMarket = bets?.firstWhere(
+              (bet) => bet["name"] == "Match Winner",
+          orElse: () => null,
+        );
+
+        if (mainMarket == null) {
+          return const Center(child: Text("Không có tỷ lệ cược chính"));
         }
 
-        return _buildOddsContent(snapshot.data!);
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Tỷ lệ cược chính",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              _buildOddRow("Thắng (1)", mainMarket["values"][0]["odd"]),
+              _buildOddRow("Hòa (X)", mainMarket["values"][1]["odd"]),
+              _buildOddRow("Thua (2)", mainMarket["values"][2]["odd"]),
+              const SizedBox(height: 24),
+              const Text(
+                "Tỷ lệ cược khác",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ..._buildOtherOdds(bets),
+            ],
+          ),
+        );
       },
     );
   }
 
-  Widget _buildOddsContent(Map<String, dynamic> matchOdds) {
-    final odds = matchOdds['odds'];
-    final homeTeamName = matchOdds['homeTeam'] as String;
-    final awayTeamName = matchOdds['awayTeam'] as String;
-
-    if (odds == 'No odds available' || odds is String) {
-      return Center(child: Text(odds.toString()));
-    }
-
-    final bookmakers = odds['bookmakers'] as List<dynamic>? ?? [];
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text(
-          '$homeTeamName vs $awayTeamName',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 16),
-        if (bookmakers.isNotEmpty)
-          ...bookmakers.map((bookmaker) {
-            final markets = bookmaker['markets'] as List<dynamic>? ?? [];
-            if (markets.isEmpty) return const SizedBox.shrink();
-
-            final outcomes = markets[0]['outcomes'] as List<dynamic>? ?? [];
-            return Card(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      bookmaker['title'] ?? 'Nhà cái không xác định',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Chủ nhà: ${outcomes.isNotEmpty ? outcomes[0]['price'] ?? '-' : '-'}'),
-                        Text('Hòa: ${outcomes.length > 2 ? outcomes[2]['price'] ?? '-' : '-'}'),
-                        Text('Khách: ${outcomes.length > 1 ? outcomes[1]['price'] ?? '-' : '-'}'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList()
-        else
-          const Text('Không có nhà cái nào cung cấp tỷ lệ cược'),
-      ],
+  Widget _buildOddRow(String label, String odd) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 16)),
+          Text(odd, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
+  }
+
+  List<Widget> _buildOtherOdds(List<dynamic>? bets) {
+    if (bets == null) return [];
+
+    final otherMarkets = bets.where((bet) => bet["name"] != "Match Winner").toList();
+
+    return otherMarkets.map((market) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            market["name"],
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          ...market["values"].map<Widget>((value) {
+            return _buildOddRow(value["value"], value["odd"]);
+          }).toList(),
+          const SizedBox(height: 16),
+        ],
+      );
+    }).toList();
   }
 }

@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import '../core/api_service.dart';
-import '../core/match_odds_service.dart';
-import '../widgets/match/match_scoreboard.dart';
 import '../widgets/match/match_overview.dart' as match_overview; // Thêm alias
-import '../widgets/match/match_odds.dart';
 import '../widgets/match/match_stats.dart' as match_stats; // Thêm alias
 import '../widgets/match/match_lineups.dart';
 import '../widgets/match/match_h2h.dart';
 import '../widgets/match/match_standings.dart';
+import '../widgets/match/match_scoreboard.dart';
 
 class MatchInforScreen extends StatefulWidget {
   final int matchId;
@@ -19,38 +17,48 @@ class MatchInforScreen extends StatefulWidget {
 }
 
 class _MatchInforScreenState extends State<MatchInforScreen> {
-  late Future<Map<String, dynamic>> _matchDetail;
-  late Future<Map<String, dynamic>> _matchStats;
-  late Future<Map<String, dynamic>> _standings;
-  late Future<Map<String, dynamic>> _h2hMatches;
-  late Future<Map<String, dynamic>> _homeTeamDetail;
-  late Future<Map<String, dynamic>> _awayTeamDetail;
-  int? homeTeamId;
-  int? awayTeamId;
-  final MatchOddsService _matchOddsService = MatchOddsService();
+  late Future<Map<String, dynamic>> _matchData;
 
   @override
   void initState() {
     super.initState();
-    _matchStats = ApiService.fetchMatchStats(widget.matchId);
-    _matchDetail = ApiService.fetchMatchDetail(widget.matchId).then((match) {
-      homeTeamId = match["homeTeam"]["id"];
-      awayTeamId = match["awayTeam"]["id"];
-      return match;
-    });
-    _standings = _matchDetail.then((match) {
-      final competitionId = match["competition"]["id"];
-      return ApiService.fetchStandings(competitionId);
-    });
-    _h2hMatches = ApiService.fetchHeadToHead(widget.matchId);
-    _homeTeamDetail = _matchDetail.then((_) => ApiService.fetchTeamDetail(homeTeamId!));
-    _awayTeamDetail = _matchDetail.then((_) => ApiService.fetchTeamDetail(awayTeamId!));
+    _matchData = _fetchAllData();
+  }
+
+  Future<Map<String, dynamic>> _fetchAllData() async {
+    try {
+      // Gọi tất cả API song song
+      final matchDetail = await ApiService.fetchMatchDetail(widget.matchId);
+      final homeTeamId = matchDetail["homeTeam"]["id"];
+      final awayTeamId = matchDetail["awayTeam"]["id"];
+
+      final results = await Future.wait([
+        ApiService.fetchMatchStats(widget.matchId),
+        ApiService.fetchStandings(matchDetail["competition"]["id"]),
+        ApiService.fetchHeadToHead(widget.matchId),
+        ApiService.fetchTeamDetail(homeTeamId),
+        ApiService.fetchTeamDetail(awayTeamId),
+      ]);
+
+      return {
+        "matchDetail": matchDetail,
+        "matchStats": results[0],
+        "standings": results[1],
+        "h2hMatches": results[2],
+        "homeTeamDetail": results[3],
+        "awayTeamDetail": results[4],
+        "homeTeamId": homeTeamId,
+        "awayTeamId": awayTeamId,
+      };
+    } catch (e) {
+      throw Exception("Lỗi tải dữ liệu: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: _matchDetail,
+      future: _matchData,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -58,7 +66,7 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
           );
         } else if (snapshot.hasError) {
           return Scaffold(
-            body: Center(child: Text("Lỗi khi tải dữ liệu trận đấu: ${snapshot.error}")),
+            body: Center(child: Text("Lỗi khi tải dữ liệu: ${snapshot.error}")),
           );
         } else if (!snapshot.hasData) {
           return const Scaffold(
@@ -66,7 +74,8 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
           );
         }
 
-        final match = snapshot.data!;
+        final data = snapshot.data!;
+        final match = data["matchDetail"];
         final homeTeam = match["homeTeam"];
         final awayTeam = match["awayTeam"];
         final score = match["score"]["fullTime"];
@@ -85,7 +94,6 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
                 isScrollable: true,
                 tabs: [
                   Tab(text: "Tổng quan"),
-                  Tab(text: "Tỷ lệ cược"),
                   Tab(text: "Thống kê"),
                   Tab(text: "Đội hình"),
                   Tab(text: "Đối đầu"),
@@ -104,28 +112,26 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
                 Expanded(
                   child: TabBarView(
                     children: [
-                      match_overview.MatchOverview( // Sử dụng với alias
-                        matchDetail: _matchDetail,
-                        homeTeamDetail: _homeTeamDetail,
+                      match_overview.MatchOverview(
+                        matchDetail: Future.value(data["matchDetail"]),
+                        homeTeamDetail: Future.value(data["homeTeamDetail"]),
                       ),
-                      MatchOdds(
-                        match: match,
-                        matchOddsService: _matchOddsService,
-                      ),
-                      match_stats.MatchStats( // Sử dụng với alias
-                        statsFuture: _matchStats,
+                      match_stats.MatchStats(
+                        statsFuture: Future.value(data["matchStats"]),
                       ),
                       MatchLineups(
-                        homeTeamDetail: _homeTeamDetail,
-                        awayTeamDetail: _awayTeamDetail,
-                        homeTeamId: homeTeamId,
-                        awayTeamId: awayTeamId,
+                        homeTeamDetail: Future.value(data["homeTeamDetail"]),
+                        awayTeamDetail: Future.value(data["awayTeamDetail"]),
+                        homeTeamId: data["homeTeamId"],
+                        awayTeamId: data["awayTeamId"],
                       ),
-                      MatchH2H(h2hFuture: _h2hMatches),
+                      MatchH2H(
+                        h2hFuture: Future.value(data["h2hMatches"]),
+                      ),
                       MatchStandings(
-                        standingsFuture: _standings,
-                        homeTeamId: homeTeamId,
-                        awayTeamId: awayTeamId,
+                        standingsFuture: Future.value(data["standings"]),
+                        homeTeamId: data["homeTeamId"],
+                         awayTeamId: data["awayTeamId"],
                       ),
                     ],
                   ),

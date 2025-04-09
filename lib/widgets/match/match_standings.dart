@@ -64,7 +64,7 @@ class MatchStandings extends StatelessWidget {
         ? Colors.green
         : isAwayTeam
         ? Colors.blue
-        : Colors.black;
+        : Colors.white;
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -72,7 +72,7 @@ class MatchStandings extends StatelessWidget {
       elevation: 3,
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.grey[200],
+          backgroundColor: Colors.black,
           child: Text(
             "${MatchUtils.getTeamPosition(team)}",
             style: const TextStyle(fontWeight: FontWeight.bold),
