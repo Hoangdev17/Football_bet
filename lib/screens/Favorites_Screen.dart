@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../core/api_service.dart';
+import '../core/auth_service.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({Key? key}) : super(key: key);
 
   @override
-  State<FavoritesScreen> createState() => _FavoritesScreenState();
+  _FavoritesScreenState createState() => _FavoritesScreenState();
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
@@ -15,47 +14,20 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   bool isLoading = false;
   String errorMessage = '';
 
-  // Danh sách ID của các giải đấu lớn
-  final List<int> majorLeagueIds = [
-    2021, // Premier League
-    2014, // La Liga
-    2002, // Bundesliga
-    2015, // Ligue 1
-    2019, // Serie A
-  ];
-
   @override
   void initState() {
     super.initState();
-    loadFavorites();
+    fetchFavorites();
   }
 
-  Future<void> loadFavorites() async {
+  Future<void> fetchFavorites() async {
     setState(() {
       isLoading = true;
       errorMessage = '';
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final favoriteIds = prefs.getStringList('favorite_matches') ?? [];
-      if (favoriteIds.isEmpty) {
-        setState(() {
-          favoriteMatches = [];
-          isLoading = false;
-        });
-        return;
-      }
-
-      List<dynamic> allMatches = [];
-      for (int leagueId in majorLeagueIds) {
-        final matches = await ApiService.fetchMatches(leagueId);
-        allMatches.addAll(matches);
-        await Future.delayed(const Duration(milliseconds: 500)); // Delay để tránh 429
-      }
-
-      final favorites = allMatches.where((match) => favoriteIds.contains(match['id'].toString())).toList();
-
+      final favorites = await AuthService.getFavoriteMatches();
       setState(() {
         favoriteMatches = favorites;
         isLoading = false;
@@ -63,85 +35,99 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     } catch (e) {
       setState(() {
         isLoading = false;
-        errorMessage = e.toString().contains('429')
-            ? 'Vượt quá giới hạn API. Vui lòng thử lại sau.'
-            : 'Lỗi khi tải dữ liệu: $e';
+        errorMessage = 'Lỗi khi tải danh sách yêu thích: $e';
       });
     }
-  }
-
-  Future<void> toggleFavorite(int matchId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final favoriteIds = prefs.getStringList('favorite_matches') ?? [];
-    final idString = matchId.toString();
-
-    if (favoriteIds.contains(idString)) {
-      favoriteIds.remove(idString);
-    } else {
-      favoriteIds.add(idString);
-    }
-    await prefs.setStringList('favorite_matches', favoriteIds);
-    await loadFavorites();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: loadFavorites,
-        child: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : errorMessage.isNotEmpty
-            ? Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(errorMessage, style: const TextStyle(color: Colors.red)),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: loadFavorites,
-                child: const Text('Thử lại'),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.black, Colors.grey[900]!],
+          ),
+        ),
+        child: RefreshIndicator(
+          onRefresh: fetchFavorites,
+          color: Colors.green,
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                backgroundColor: Colors.transparent,
+                title: const Text('Trận đấu yêu thích', style: TextStyle(fontWeight: FontWeight.bold)),
+                floating: true,
+                automaticallyImplyLeading: false,
+              ),
+              SliverToBoxAdapter(
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator(color: Colors.green))
+                    : errorMessage.isNotEmpty
+                    ? Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        errorMessage,
+                        style: const TextStyle(color: Colors.red, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: fetchFavorites,
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                        child: const Text('Thử lại'),
+                      ),
+                    ],
+                  ),
+                )
+                    : favoriteMatches.isEmpty
+                    ? const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(
+                    child: Text(
+                      'Chưa có trận đấu yêu thích nào',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                )
+                    : Column(
+                  children: favoriteMatches.map((match) {
+                    return FavoriteMatchCard(match: match);
+                  }).toList(),
+                ),
               ),
             ],
           ),
-        )
-            : favoriteMatches.isEmpty
-            ? const Center(child: Text('Chưa có trận đấu yêu thích nào'))
-            : ListView.builder(
-          itemCount: favoriteMatches.length,
-          itemBuilder: (context, index) {
-            final match = favoriteMatches[index];
-            return FavoriteCard(
-              match: match,
-              onToggleFavorite: () => toggleFavorite(match['id']),
-            );
-          },
         ),
       ),
     );
   }
 }
 
-class FavoriteCard extends StatelessWidget {
+class FavoriteMatchCard extends StatelessWidget {
   final dynamic match;
-  final VoidCallback onToggleFavorite;
 
-  const FavoriteCard({Key? key, required this.match, required this.onToggleFavorite}) : super(key: key);
+  const FavoriteMatchCard({Key? key, required this.match}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final homeTeam = match['homeTeam']['name'];
-    final awayTeam = match['awayTeam']['name'];
-    final matchTime = DateTime.parse(match['utcDate']);
-    final status = match['status'];
+    final homeTeam = match['homeTeam'];
+    final awayTeam = match['awayTeam'];
+    final matchTime = DateTime.parse(match['matchDate']);
 
     return Card(
-      color: Colors.grey[900],
+      color: Colors.grey[850],
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
               child: Column(
@@ -149,21 +135,22 @@ class FavoriteCard extends StatelessWidget {
                 children: [
                   Text(
                     '$homeTeam vs $awayTeam',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${DateFormat('HH:mm').format(matchTime.toLocal())} - $status',
-                    style: const TextStyle(fontSize: 14),
+                    'Thời gian: ${DateFormat('HH:mm - dd/MM').format(matchTime.toLocal())}',
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.favorite, color: Colors.red),
-              onPressed: onToggleFavorite,
-            ),
+            const Icon(Icons.sports_soccer, color: Colors.green, size: 30),
           ],
         ),
       ),

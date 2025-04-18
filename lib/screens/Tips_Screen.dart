@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_service.dart';
+import '../core/auth_service.dart';
 
 class TipsScreen extends StatefulWidget {
   const TipsScreen({Key? key}) : super(key: key);
@@ -16,6 +16,7 @@ class _TipsScreenState extends State<TipsScreen> {
   String errorMessage = '';
   List<String> favoriteIds = [];
 
+  // Danh sách leagueId cho các giải đấu lớn của Football-Data.org
   final List<int> majorLeagueIds = [
     2021, // Premier League
     2014, // La Liga
@@ -32,10 +33,16 @@ class _TipsScreenState extends State<TipsScreen> {
   }
 
   Future<void> _loadFavoriteIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      favoriteIds = prefs.getStringList('favorite_matches') ?? [];
-    });
+    try {
+      final favorites = await AuthService.getFavoriteMatches();
+      setState(() {
+        favoriteIds = favorites.map((match) => match['matchIdFromAPI'].toString()).toList();
+      });
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Lỗi khi tải danh sách yêu thích: $e';
+      });
+    }
   }
 
   Future<void> fetchTips() async {
@@ -77,25 +84,53 @@ class _TipsScreenState extends State<TipsScreen> {
     }
   }
 
-  Future<void> toggleFavorite(int matchId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final favoriteIds = prefs.getStringList('favorite_matches') ?? [];
-    final idString = matchId.toString();
+  Future<void> toggleFavorite(dynamic match) async {
+    final matchId = match['id'].toString();
+    final homeTeam = match['homeTeam']['name'];
+    final awayTeam = match['awayTeam']['name'];
+    final matchDate = match['utcDate'];
 
-    if (favoriteIds.contains(idString)) {
-      favoriteIds.remove(idString);
-    } else {
-      favoriteIds.add(idString);
+    try {
+      if (favoriteIds.contains(matchId)) {
+        // Nếu đã yêu thích, không gọi API xóa (vì API không hỗ trợ xóa)
+        // Thay vào đó, cập nhật UI
+        setState(() {
+          favoriteIds.remove(matchId);
+        });
+      } else {
+        // Gọi API để thêm trận đấu yêu thích
+        await AuthService.addFavoriteMatch(
+          matchId: matchId,
+          homeTeam: homeTeam,
+          awayTeam: awayTeam,
+          matchDate: matchDate,
+        );
+        setState(() {
+          favoriteIds.add(matchId);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e')),
+      );
     }
-    await prefs.setStringList('favorite_matches', favoriteIds);
-    setState(() {
-      this.favoriteIds = favoriteIds;
-    });
   }
 
   String _generateTip(dynamic match) {
     final homeTeam = match['homeTeam']['name'];
-    return 'Đặt cược $homeTeam thắng (Tỷ lệ giả định: 1.8)';
+    final odds = match['odds'];
+    if (odds.isNotEmpty) {
+      final homeWinOdds = odds['home_team_win'] ?? 0.0;
+      if (homeWinOdds > 0.5) {
+        return 'Đặt cược $homeTeam thắng (Xác suất: ${(homeWinOdds * 100).toStringAsFixed(1)}%)';
+      } else if (odds['draw'] > 0.4) {
+        return 'Đặt cược hòa (Xác suất: ${(odds['draw'] * 100).toStringAsFixed(1)}%)';
+      } else {
+        final awayTeam = match['awayTeam']['name'];
+        return 'Đặt cược $awayTeam thắng (Xác suất: ${(odds['away_team_win'] * 100).toStringAsFixed(1)}%)';
+      }
+    }
+    return 'Không có mẹo cá cược (thiếu dữ liệu tỷ lệ)';
   }
 
   @override
@@ -110,7 +145,10 @@ class _TipsScreenState extends State<TipsScreen> {
           ),
         ),
         child: RefreshIndicator(
-          onRefresh: fetchTips,
+          onRefresh: () async {
+            await fetchTips();
+            await _loadFavoriteIds();
+          },
           color: Colors.green,
           child: CustomScrollView(
             slivers: [
@@ -136,7 +174,10 @@ class _TipsScreenState extends State<TipsScreen> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: fetchTips,
+                        onPressed: () async {
+                          await fetchTips();
+                          await _loadFavoriteIds();
+                        },
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                         child: const Text('Thử lại'),
                       ),
@@ -159,7 +200,7 @@ class _TipsScreenState extends State<TipsScreen> {
                       match: match,
                       tip: _generateTip(match),
                       isFavorite: favoriteIds.contains(match['id'].toString()),
-                      onToggleFavorite: () => toggleFavorite(match['id']),
+                      onToggleFavorite: () => toggleFavorite(match),
                     );
                   }).toList(),
                 ),

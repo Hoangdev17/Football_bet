@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
-import 'screens/MatchListScreen.dart'; // Import màn hình danh sách trận đấu
+import 'screens/MatchListScreen.dart';
 import 'screens/MatchInforScreen.dart';
 import 'screens/Live_Screen.dart';
 import 'screens/Tips_Screen.dart';
 import 'screens/Favorites_Screen.dart';
+import 'screens/loginscreen.dart';
+import 'core/auth_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -21,7 +25,20 @@ class MyApp extends StatelessWidget {
         primaryColor: Colors.black,
         scaffoldBackgroundColor: Colors.black,
       ),
-      home: const MainScreen(),
+      home: FutureBuilder<String?>(
+        future: AuthService.getToken(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+            return const MainScreen();
+          }
+          return const LoginScreen();
+        },
+      ),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -36,13 +53,13 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
-  Widget _currentScreen = HomeScreen(); // Mặc định là HomeScreen
+  Widget _currentScreen = HomeScreen(); // Changed to HomeScreen()
 
   final List<Widget> _tabs = [
-    HomeScreen(),
-    LiveMatchesScreen(),
-    TipsScreen(),
-    FavoritesScreen(),
+    HomeScreen(), // Changed to HomeScreen()
+    const LiveMatchesScreen(), // Changed to LiveMatchesScreen()
+    const TipsScreen(), // Kept const, as TipsScreen has const constructor
+    const FavoritesScreen(), // Changed to FavoritesScreen()
   ];
 
   // Mở màn hình danh sách trận đấu
@@ -54,9 +71,18 @@ class _MainScreenState extends State<MainScreen> {
 
   // Quay về trang Home
   void _goBackToHome() {
-    setState(() {
-      _currentScreen = HomeScreen();
-    });
+    setState() {
+      _currentScreen = HomeScreen(); // Changed to HomeScreen()
+    };
+  }
+
+  // Đăng xuất
+  Future<void> _logout() async {
+    await AuthService.logout();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
   }
 
   @override
@@ -66,10 +92,17 @@ class _MainScreenState extends State<MainScreen> {
         title: Text(_getAppBarTitle(_currentIndex)),
         leading: _currentScreen is MatchListScreen
             ? IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back),
           onPressed: _goBackToHome, // Quay lại Home khi nhấn Back
         )
             : null,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: 'Đăng xuất',
+          ),
+        ],
       ),
       body: _currentScreen, // Hiển thị màn hình hiện tại
       bottomNavigationBar: BottomNavigationBar(
@@ -92,7 +125,7 @@ class _MainScreenState extends State<MainScreen> {
             label: "Tips",
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.people),
+            icon: Icon(Icons.favorite),
             label: "Favorites",
           ),
         ],
@@ -116,7 +149,6 @@ class _MainScreenState extends State<MainScreen> {
         return "Tips";
       case 3:
         return "Favorites";
-      case 4:
       default:
         return "Football Bet";
     }
