@@ -26,6 +26,7 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
   }
 
   Future<Map<String, dynamic>> _fetchAllData() async {
+
     try {
       // Gọi tất cả API song song
       final matchDetail = await ApiService.fetchMatchDetail(widget.matchId);
@@ -84,7 +85,7 @@ class _MatchInforScreenState extends State<MatchInforScreen> {
         final awayScore = isFinished ? score["away"]?.toString() ?? "?" : "?";
 
         return DefaultTabController(
-          length: 6,
+          length: 5,
           child: Scaffold(
             appBar: AppBar(
               backgroundColor: Colors.green,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -118,20 +119,32 @@ class ApiService {
 
   /// Lấy thông tin chi tiết của một trận đấu
   static Future<Map<String, dynamic>> fetchMatchDetail(int matchId) async {
-    return await _getRequest("/matches/$matchId");
+    final data = await _getRequest("/matches/$matchId");
+    // printLongString("data detail match: ${jsonEncode(data)}");
+    return data;
   }
 
   /// Lấy thống kê trận đấu từ kết quả chi tiết
   static Future<Map<String, dynamic>> fetchMatchStats(int matchId) async {
     final data = await _getRequest("/matches/$matchId");
+
+    printLongString("Match detail: ${jsonEncode(data)}");
+
     return data["match"]?["statistics"] ?? {};
   }
 
-  /// Lấy thông tin chi tiết của một đội bóng dựa trên teamId
+
+  static void printLongString(String text) {
+    final pattern = RegExp('.{1,800}');
+    for (final match in pattern.allMatches(text)) {
+      print(match.group(0));
+    }
+  }
+
   static Future<Map<String, dynamic>> fetchTeamDetail(int teamId) async {
     final data = await _getRequest("/teams/$teamId");
     if (enableLogging) {
-      print("Team data for team $teamId: ${json.encode(data)}");
+      // printLongString("Team data for team $teamId: ${json.encode(data)}");
     }
     return data ?? {};
   }

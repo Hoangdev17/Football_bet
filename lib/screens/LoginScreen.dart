@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../core/auth_service.dart';
-import 'registerscreen.dart';
+import 'package:http/http.dart' as http;
 import 'home_screen.dart';
+import 'registerscreen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -22,19 +23,35 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
+    final String apiUrl = 'http://172.20.10.2:5000/api/auth/login';
+
     try {
-      await AuthService.login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': _emailController.text.trim(),
+          'password': _passwordController.text.trim(),
+        }),
       );
-      // Điều hướng đến MainScreen sau khi đăng nhập thành công
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomeScreen()),
-      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Bạn có thể lưu token vào local storage nếu cần
+        print('Đăng nhập thành công: $data');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+        );
+      } else {
+        final error = jsonDecode(response.body);
+        setState(() {
+          _errorMessage = error['message'] ?? 'Đăng nhập thất bại';
+        });
+      }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = 'Lỗi kết nối server: $e';
       });
     } finally {
       setState(() {

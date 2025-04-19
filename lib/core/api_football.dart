@@ -1,10 +1,10 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import '../models/live_match.dart';  // Make sure to import your models
+import '../models/live_match.dart';
 
 class ApiFootball {
-  static const String apiKey = "01402f82bd0d9d7d4815dc708fd9e180"; // Replace with your actual API key
+  static const String apiKey = "01402f82bd0d9d7d4815dc708fd9e180";
   static const String baseUrl = "https://v3.football.api-sports.io";
 
   // Get live matches
@@ -60,6 +60,7 @@ class ApiFootball {
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
+      print('match event ${data}');
       return (data["response"] ?? []).map<MatchEvent>((e) => MatchEvent.fromJson(e)).toList();
     }
     throw Exception("Failed to load match events: ${response.statusCode}");

@@ -10,7 +10,10 @@ class MatchStats extends StatelessWidget {
   Widget build(BuildContext context) {
     return TabUtils.buildTabContent(
       future: statsFuture,
-      builder: (data) => _buildStatsContent(data),
+      builder: (data) {
+        print("📊 Stats data: $data"); // Thêm dòng này để kiểm tra
+        return _buildStatsContent(data);
+      },
       emptyMessage: "Không có thống kê trận đấu",
       errorMessage: "Lỗi khi tải thống kê",
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:football_bet/screens/RegisterScreen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
 import 'screens/MatchListScreen.dart';
@@ -36,7 +37,7 @@ class MyApp extends StatelessWidget {
           if (snapshot.hasData && snapshot.data!.isNotEmpty) {
             return const MainScreen();
           }
-          return const LoginScreen();
+          return const RegisterScreen();
         },
       ),
       debugShowCheckedModeBanner: false,

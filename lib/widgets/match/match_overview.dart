@@ -22,11 +22,18 @@ class MatchOverview extends StatelessWidget {
     return FutureBuilder(
       future: Future.wait([matchDetail, homeTeamDetail]),
       builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-        return FutureHandler(
-          snapshot: snapshot,
-          emptyMessage: "Không có dữ liệu tổng quan trận đấu",
-          successWidget: _buildOverviewContent(snapshot.data![0], snapshot.data![1]),
-        );
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Lỗi: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.length < 2) {
+          return const Center(child: Text("Không có dữ liệu tổng quan trận đấu"));
+        } else {
+          return _buildOverviewContent(
+            snapshot.data![0] as Map<String, dynamic>,
+            snapshot.data![1] as Map<String, dynamic>,
+          );
+        }
       },
     );
   }
