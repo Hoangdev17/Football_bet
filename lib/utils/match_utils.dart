@@ -22,9 +22,16 @@ class MatchUtils {
 
   static String formatMatchTime(String utcDate) {
     if (utcDate.isEmpty) return "Không rõ";
-    final parts = utcDate.split("T");
-    final date = parts[0];
-    final time = parts[1].substring(0, 5);
-    return "$date lúc $time";
+    try {
+      final parts = utcDate.split("T");
+      final dateParts = parts[0].split("-"); // [yyyy, mm, dd]
+      final time = parts[1].substring(0, 5); // hh:mm
+
+      final formattedDate = "${dateParts[2]}/${dateParts[1]}/${dateParts[0]}"; // dd/MM/yyyy
+      return "$time $formattedDate";
+    } catch (e) {
+      return "Không rõ";
+    }
   }
+
 }

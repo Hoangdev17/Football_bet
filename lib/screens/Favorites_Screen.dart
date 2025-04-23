@@ -13,11 +13,28 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   List<dynamic> favoriteMatches = [];
   bool isLoading = false;
   String errorMessage = '';
+  bool isLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
-    fetchFavorites();
+    checkLoginStatus();
+  }
+
+  Future<void> checkLoginStatus() async {
+    try {
+      final loggedIn = await AuthService.isLoggedIn();
+      setState(() {
+        isLoggedIn = loggedIn;
+      });
+      if (loggedIn) {
+        fetchFavorites();
+      }
+    } catch (e) {
+      setState(() {
+        isLoggedIn = false;
+      });
+    }
   }
 
   Future<void> fetchFavorites() async {
@@ -37,6 +54,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         isLoading = false;
         errorMessage = 'Lỗi khi tải danh sách yêu thích: $e';
       });
+      // Redirect to UserScreen if not logged in
+      if (e.toString().contains('Chưa đăng nhập')) {
+        Navigator.pushNamed(context, '/user');
+      }
     }
   }
 
@@ -52,18 +73,46 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ),
         ),
         child: RefreshIndicator(
-          onRefresh: fetchFavorites,
+          onRefresh: isLoggedIn ? fetchFavorites : () async {},
           color: Colors.green,
           child: CustomScrollView(
             slivers: [
               SliverAppBar(
                 backgroundColor: Colors.transparent,
-                title: const Text('Trận đấu yêu thích', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('Trận đấu yêu thích', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                 floating: true,
                 automaticallyImplyLeading: false,
               ),
               SliverToBoxAdapter(
-                child: isLoading
+                child: !isLoggedIn
+                    ? Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Vui lòng đăng nhập để xem trận đấu yêu thích',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/user');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text(
+                          'Đăng nhập',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+                    : isLoading
                     ? const Center(child: CircularProgressIndicator(color: Colors.green))
                     : errorMessage.isNotEmpty
                     ? Padding(
@@ -79,8 +128,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: fetchFavorites,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                        child: const Text('Thử lại'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text(
+                          'Thử lại',
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ),
                     ],
                   ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/api_service.dart';
 import 'MatchInforScreen.dart';
+import 'package:intl/intl.dart'; // Thêm để định dạng ngày giờ
 
 class MatchListScreen extends StatefulWidget {
   final int leagueId;
@@ -13,6 +14,7 @@ class MatchListScreen extends StatefulWidget {
 
 class _MatchListScreenState extends State<MatchListScreen> {
   late Future<List<dynamic>> _matches;
+  Set<int> _favoriteMatches = {};
 
   @override
   void initState() {
@@ -51,6 +53,11 @@ class _MatchListScreenState extends State<MatchListScreen> {
               final awayTeam = match["awayTeam"];
               final score = match["score"]["fullTime"];
               final isFinished = match["status"] == "FINISHED";
+              final utcTime = match["utcDate"]; // Thời gian gốc UTC
+
+              // Chuyển thành giờ địa phương
+              final dateTime = DateTime.parse(utcTime).toLocal();
+              final formattedTime = DateFormat("HH:mm dd/MM/yyyy").format(dateTime);
 
               final homeScore = isFinished ? score["home"]?.toString() ?? "?" : "?";
               final awayScore = isFinished ? score["away"]?.toString() ?? "?" : "?";
@@ -75,11 +82,14 @@ class _MatchListScreenState extends State<MatchListScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Cột đội nhà (logo + tên)
+                        // Cột đội nhà
                         Expanded(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              const Text("Home team",
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color:Colors.green)),
+                              const SizedBox(height: 4),
                               Image.network(
                                 homeTeam["crest"] ?? "",
                                 width: 40,
@@ -98,23 +108,34 @@ class _MatchListScreenState extends State<MatchListScreen> {
                           ),
                         ),
 
-                        // Cột tỷ số ở giữa
+                        // Cột giữa: Tỷ số và thời gian
                         SizedBox(
-                          width: 80,
-                          child: Center(
-                            child: Text(
-                              "$homeScore - $awayScore",
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center,
-                            ),
+                          width: 100,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "$homeScore - $awayScore",
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                formattedTime,
+                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
                         ),
 
-                        // Cột đội khách (logo + tên)
+                        // Cột đội khách
                         Expanded(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              const Text("Away team",
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color:Colors.blue)),
+                              const SizedBox(height: 4),
                               Image.network(
                                 awayTeam["crest"] ?? "",
                                 width: 40,
@@ -131,6 +152,25 @@ class _MatchListScreenState extends State<MatchListScreen> {
                               ),
                             ],
                           ),
+                        ),
+
+                        // Nút yêu thích
+                        IconButton(
+                          icon: Icon(
+                            _favoriteMatches.contains(matchId)
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: Colors.red,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              if (_favoriteMatches.contains(matchId)) {
+                                _favoriteMatches.remove(matchId);
+                              } else {
+                                _favoriteMatches.add(matchId);
+                              }
+                            });
+                          },
                         ),
                       ],
                     ),

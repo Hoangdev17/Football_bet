@@ -1,88 +1,49 @@
+import 'package:ffff/screens/User_Screen.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
-import 'screens/MatchListScreen.dart';
-import 'screens/MatchInforScreen.dart';
-import 'screens/Live_Screen.dart';
-import 'screens/Tips_Screen.dart';
-import 'screens/Favorites_Screen.dart';
-import 'screens/loginscreen.dart';
-import 'core/auth_service.dart';
+import 'screens/live_screen.dart';
+import 'screens/tips_screen.dart';
+import 'screens/favorites_screen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+void main() {
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: true,
       title: 'Football Bet',
-      theme: ThemeData.dark().copyWith(
-        primaryColor: Colors.black,
-        scaffoldBackgroundColor: Colors.black,
+      theme: ThemeData(
+        primarySwatch: Colors.green,
       ),
-      home: FutureBuilder<String?>(
-        future: AuthService.getToken(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-            return const MainScreen();
-          }
-          return const LoginScreen();
-        },
-      ),
-      debugShowCheckedModeBanner: false,
+      home: MainScreen(),
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
-
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  _MainScreenState createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
-  Widget _currentScreen = HomeScreen(); // Changed to HomeScreen()
+  late Widget _currentScreen;
 
   final List<Widget> _tabs = [
-    HomeScreen(), // Changed to HomeScreen()
-    const LiveMatchesScreen(), // Changed to LiveMatchesScreen()
-    const TipsScreen(), // Kept const, as TipsScreen has const constructor
-    const FavoritesScreen(), // Changed to FavoritesScreen()
+    HomeScreen(),
+    LiveMatchesScreen(),
+    UserScreen(),
+    TipsScreen(),
+    FavoritesScreen(),
   ];
 
-  // Mở màn hình danh sách trận đấu
-  void _openMatchListScreen(int leagueId) {
-    setState(() {
-      _currentScreen = MatchListScreen(leagueId: leagueId);
-    });
-  }
-
-  // Quay về trang Home
-  void _goBackToHome() {
-    setState() {
-      _currentScreen = HomeScreen(); // Changed to HomeScreen()
-    };
-  }
-
-  // Đăng xuất
-  Future<void> _logout() async {
-    await AuthService.logout();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _currentScreen = _tabs[_currentIndex];
   }
 
   @override
@@ -90,23 +51,12 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_getAppBarTitle(_currentIndex)),
-        leading: _currentScreen is MatchListScreen
-            ? IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _goBackToHome, // Quay lại Home khi nhấn Back
-        )
-            : null,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-            tooltip: 'Đăng xuất',
-          ),
-        ],
+        backgroundColor: Colors.green[700],
+        centerTitle: true,
       ),
-      body: _currentScreen, // Hiển thị màn hình hiện tại
+      body: _currentScreen,
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: Colors.white,
         selectedItemColor: Colors.green,
         unselectedItemColor: Colors.grey,
         currentIndex: _currentIndex,
@@ -121,18 +71,22 @@ class _MainScreenState extends State<MainScreen> {
             label: "Live",
           ),
           BottomNavigationBarItem(
+              icon: Icon(Icons.login_rounded),
+              label: "User"
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.table_chart),
             label: "Tips",
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
+            icon: Icon(Icons.people),
             label: "Favorites",
           ),
         ],
         onTap: (index) {
           setState(() {
             _currentIndex = index;
-            _currentScreen = _tabs[index]; // Chuyển đổi giữa các tab
+            _currentScreen = _tabs[index];
           });
         },
       ),
@@ -146,8 +100,10 @@ class _MainScreenState extends State<MainScreen> {
       case 1:
         return "Live";
       case 2:
-        return "Tips";
+        return "User";
       case 3:
+        return "Tips";
+      case 4:
         return "Favorites";
       default:
         return "Football Bet";

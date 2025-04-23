@@ -105,11 +105,20 @@ class ApiService {
   static Future<List<dynamic>> fetchMatches(int leagueId) async {
     final data = await _getRequest("/competitions/$leagueId/matches");
     List<dynamic> matches = data["matches"] ?? [];
-    return matches.where((match) {
+
+    // Lọc các trận từ năm 2025 trở đi
+    matches = matches.where((match) {
       final matchDate = DateTime.parse(match["utcDate"]);
       return matchDate.year >= 2025;
     }).toList();
+
+    // Sắp xếp từ mới nhất -> cũ nhất
+    matches.sort((a, b) =>
+        DateTime.parse(b["utcDate"]).compareTo(DateTime.parse(a["utcDate"])));
+
+    return matches;
   }
+
 
   /// Lấy bảng xếp hạng của giải đấu
   static Future<Map<String, dynamic>> fetchStandings(int competitionId) async {

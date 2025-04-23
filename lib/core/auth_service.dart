@@ -6,6 +6,12 @@ class AuthService {
   static const String baseUrl = 'http://localhost:5000/api/auth';
   static const String matchesUrl = 'http://localhost:5000/api/matches';
 
+  // Check if user is logged in
+  static Future<bool> isLoggedIn() async {
+    final token = await getToken();
+    return token != null;
+  }
+
   // Đăng ký người dùng
   static Future<Map<String, dynamic>> register({
     required String email,
